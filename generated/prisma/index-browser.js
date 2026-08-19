@@ -120,9 +120,103 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
   Serializable: 'Serializable'
 });
 
+exports.Prisma.CourseScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  club: 'club',
+  city: 'city',
+  state: 'state',
+  country: 'country',
+  lat: 'lat',
+  lng: 'lng',
+  slug: 'slug',
+  source: 'source',
+  externalId: 'externalId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.TeeScalarFieldEnum = {
+  id: 'id',
+  courseId: 'courseId',
+  name: 'name',
+  gender: 'gender',
+  rating: 'rating',
+  slope: 'slope',
+  par: 'par',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.TeeHoleScalarFieldEnum = {
+  id: 'id',
+  teeId: 'teeId',
+  holeNumber: 'holeNumber',
+  par: 'par',
+  strokeIndex: 'strokeIndex',
+  yards: 'yards'
+};
+
+exports.Prisma.RoundScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  teeId: 'teeId',
+  datePlayed: 'datePlayed',
+  notes: 'notes',
+  holesPlayed: 'holesPlayed',
+  adjustedGrossScore: 'adjustedGrossScore',
+  differential: 'differential',
+  courseHandicap: 'courseHandicap',
+  courseHandicapSource: 'courseHandicapSource',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.HoleScoreScalarFieldEnum = {
+  id: 'id',
+  roundId: 'roundId',
+  holeNumber: 'holeNumber',
+  par: 'par',
+  strokeIndex: 'strokeIndex',
+  score: 'score'
+};
+
+exports.Prisma.SortOrder = {
+  asc: 'asc',
+  desc: 'desc'
+};
+
+exports.Prisma.QueryMode = {
+  default: 'default',
+  insensitive: 'insensitive'
+};
+
+exports.Prisma.NullsOrder = {
+  first: 'first',
+  last: 'last'
+};
+exports.CourseSource = exports.$Enums.CourseSource = {
+  OVERPASS: 'OVERPASS',
+  GOLF_COURSE_API: 'GOLF_COURSE_API',
+  MANUAL: 'MANUAL'
+};
+
+exports.Gender = exports.$Enums.Gender = {
+  MENS: 'MENS',
+  WOMENS: 'WOMENS'
+};
+
+exports.CourseHandicapSource = exports.$Enums.CourseHandicapSource = {
+  INDEX: 'INDEX',
+  MANUAL: 'MANUAL'
+};
 
 exports.Prisma.ModelName = {
-
+  Course: 'Course',
+  Tee: 'Tee',
+  TeeHole: 'TeeHole',
+  Round: 'Round',
+  HoleScore: 'HoleScore'
 };
 
 /**

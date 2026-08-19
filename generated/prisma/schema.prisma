@@ -6,3 +6,106 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum Gender {
+  MENS
+  WOMENS
+}
+
+enum CourseSource {
+  OVERPASS
+  GOLF_COURSE_API
+  MANUAL
+}
+
+enum CourseHandicapSource {
+  INDEX
+  MANUAL
+}
+
+model Course {
+  id         String       @id @default(cuid())
+  name       String
+  club       String?
+  city       String?
+  state      String?
+  country    String?
+  lat        Float?
+  lng        Float?
+  slug       String?      @unique
+  source     CourseSource @default(MANUAL)
+  externalId String?
+  tees       Tee[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([source, externalId])
+  @@index([name])
+  @@index([city, state])
+  @@index([lat, lng])
+}
+
+model Tee {
+  id        String    @id @default(cuid())
+  courseId  String
+  course    Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  name      String
+  gender    Gender
+  rating    Float
+  slope     Int
+  par       Int
+  holes     TeeHole[]
+  rounds    Round[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([courseId, name, gender])
+  @@index([courseId])
+}
+
+model TeeHole {
+  id          String @id @default(cuid())
+  teeId       String
+  tee         Tee    @relation(fields: [teeId], references: [id], onDelete: Cascade)
+  holeNumber  Int
+  par         Int
+  strokeIndex Int
+  yards       Int?
+
+  @@unique([teeId, holeNumber])
+  @@index([teeId])
+}
+
+model Round {
+  id                   String               @id @default(cuid())
+  userId               String
+  teeId                String
+  tee                  Tee                  @relation(fields: [teeId], references: [id], onDelete: Restrict)
+  datePlayed           DateTime             @db.Timestamp(0)
+  notes                String?
+  holesPlayed          Int                  @default(18)
+  adjustedGrossScore   Int
+  differential         Float
+  courseHandicap       Int
+  courseHandicapSource CourseHandicapSource
+  holeScores           HoleScore[]
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@index([userId, datePlayed])
+  @@index([teeId])
+  @@index([userId])
+}
+
+model HoleScore {
+  id          String @id @default(cuid())
+  roundId     String
+  round       Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  holeNumber  Int
+  par         Int
+  strokeIndex Int
+  score       Int?
+
+  @@unique([roundId, holeNumber])
+  @@index([roundId])
+}
