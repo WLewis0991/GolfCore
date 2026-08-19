@@ -39,16 +39,16 @@ model Course {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
+  @@unique([source, externalId])
   @@index([name])
   @@index([city, state])
   @@index([lat, lng])
-  @@unique([source, externalId])
 }
 
 model Tee {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   courseId  String
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course    Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
   name      String
   gender    Gender
   rating    Float
@@ -56,8 +56,8 @@ model Tee {
   par       Int
   holes     TeeHole[]
   rounds    Round[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@unique([courseId, name, gender])
   @@index([courseId])
@@ -77,20 +77,20 @@ model TeeHole {
 }
 
 model Round {
-  id                   String              @id @default(cuid())
+  id                   String               @id @default(cuid())
   userId               String
   teeId                String
-  tee                  Tee                 @relation(fields: [teeId], references: [id], onDelete: Restrict)
-  datePlayed           DateTime            @db.Timestamp(0)
+  tee                  Tee                  @relation(fields: [teeId], references: [id], onDelete: Restrict)
+  datePlayed           DateTime             @db.Timestamp(0)
   notes                String?
-  holesPlayed          Int                 @default(18)
+  holesPlayed          Int                  @default(18)
   adjustedGrossScore   Int
   differential         Float
   courseHandicap       Int
   courseHandicapSource CourseHandicapSource
   holeScores           HoleScore[]
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
 
   @@index([userId, datePlayed])
   @@index([teeId])
