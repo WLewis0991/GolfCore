@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils/format";
 const links = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/rounds", label: "Rounds" },
+  { href: "/history", label: "History" },
 ];
 
 export function Nav() {
