@@ -16,7 +16,7 @@ export const createRoundSchema = z.object({
     message: "Must be 9 or 18 holes",
   }),
   courseHandicap: z.number().int(),
-  courseHandicapSource: z.enum(["Index", "Manual"]),
+  courseHandicapSource: z.enum(["INDEX", "MANUAL"]),
   holeScores: z.array(holeScoreSchema).min(1, "At least one hole score required"),
   notes: z.string().max(500).optional(),
 });
