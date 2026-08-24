@@ -23,7 +23,7 @@ const eslintConfig = defineConfig([
       "no-console": ["warn", { allow: ["warn", "error"] }],
     },
   },
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "node_modules/**"]),
+  globalIgnores([".next/**", "out/**", "build/**", "generated/**", "next-env.d.ts", "node_modules/**"]),
 ]);
 
 export default eslintConfig;

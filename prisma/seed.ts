@@ -2,6 +2,7 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { PrismaNeon } from "@prisma/adapter-neon";
+
 import { PrismaClient } from "../generated/prisma";
 
 const prisma = new PrismaClient({
