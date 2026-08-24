@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { IndexChart } from "@/components/index-chart";
+import { exportToCSV, exportToJSON } from "@/lib/utils/export";
 import { formatDifferential, formatHandicap } from "@/lib/utils/format";
 
 export interface HistoryDataPoint {
@@ -95,6 +96,24 @@ export function HistoryContent({ data }: HistoryContentProps) {
           >
             Clear filters
           </button>
+        )}
+        {filtered.length > 0 && (
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={() => exportToCSV(filtered)}
+              className="rounded border border-[var(--text-tertiary)]/30 px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--green)] hover:text-[var(--foreground)]"
+            >
+              Export CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => exportToJSON(filtered)}
+              className="rounded border border-[var(--text-tertiary)]/30 px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--green)] hover:text-[var(--foreground)]"
+            >
+              Export JSON
+            </button>
+          </div>
         )}
       </div>
 
