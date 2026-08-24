@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const data = await res.json();
     const courses = (data.courses ?? []).map(
       (c: {
-        id: number;
+        id: string;
         name?: string;
         course_name?: string;
         club_name?: string;

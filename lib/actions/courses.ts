@@ -3,15 +3,14 @@
 import { prisma } from "@/lib/prisma";
 
 type OpenGolfCourse = {
-  id: number;
   name: string;
-  club: string | null;
   city: string | null;
   state: string | null;
   lat: number | null;
   lng: number | null;
   tees: {
     name: string;
+    color: string | null;
     gender: string;
     rating: number;
     slope: number;
@@ -31,55 +30,57 @@ async function fetchCourseData(
   externalId: string,
 ): Promise<OpenGolfCourse | null> {
   try {
-    const res = await fetch(`${OPENGOLF_API}/v1/courses/${externalId}/tees`);
-    if (!res.ok) return null;
-    const data = await res.json();
+    const [courseRes, teesRes, holesRes] = await Promise.all([
+      fetch(`${OPENGOLF_API}/v1/courses/${externalId}`),
+      fetch(`${OPENGOLF_API}/v1/courses/${externalId}/tees`),
+      fetch(`${OPENGOLF_API}/v1/courses/${externalId}/holes`),
+    ]);
+
+    if (!courseRes.ok || !teesRes.ok) return null;
+
+    const courseData = await courseRes.json();
+    const teesData = await teesRes.json();
+    const holesData = holesRes.ok ? await holesRes.json() : { holes: [] };
+
+    const holes: {
+      number: number;
+      par: number;
+      handicap_index: number;
+      yardages: Record<string, number>;
+    }[] = holesData.holes ?? [];
 
     return {
-      id: data.id,
-      name: data.course_name ?? data.club_name ?? "Unknown",
-      club: data.club_name ?? null,
-      city: data.city ?? null,
-      state: data.state ?? null,
-      lat: data.latitude ?? null,
-      lng: data.longitude ?? null,
-      tees: (data.tees ?? []).map(
+      name: courseData.course_name ?? courseData.name ?? "Unknown",
+      city: courseData.city ?? null,
+      state: courseData.state ?? null,
+      lat: courseData.latitude ?? null,
+      lng: courseData.longitude ?? null,
+      tees: (teesData.tees ?? []).map(
         (t: {
           tee_name?: string;
-          name?: string;
+          tee_key?: string;
+          tee_color?: string;
           gender?: string;
           course_rating?: number;
+          slope?: number;
           slope_rating?: number;
-          par_total?: number;
           par?: number;
-          holes?: {
-            hole?: number;
-            par?: number;
-            handicap?: number;
-            yardage?: number;
-          }[];
         }) => ({
-          name: t.tee_name ?? t.name ?? "Unknown",
+          name: t.tee_name ?? t.tee_key ?? "Unknown",
+          color: t.tee_color ?? null,
           gender:
             (t.gender ?? "male").toUpperCase() === "FEMALE"
               ? "WOMENS"
               : "MENS",
           rating: t.course_rating ?? 0,
-          slope: t.slope_rating ?? 113,
-          par: t.par_total ?? t.par ?? 72,
-          holes: (t.holes ?? []).map(
-            (h: {
-              hole?: number;
-              par?: number;
-              handicap?: number;
-              yardage?: number;
-            }) => ({
-              holeNumber: h.hole ?? 0,
-              par: h.par ?? 4,
-              strokeIndex: h.handicap ?? 1,
-              yards: h.yardage ?? null,
-            }),
-          ),
+          slope: t.slope ?? t.slope_rating ?? 113,
+          par: t.par ?? 72,
+          holes: holes.map((h) => ({
+            holeNumber: h.number,
+            par: h.par,
+            strokeIndex: h.handicap_index,
+            yards: t.tee_color ? (h.yardages[t.tee_color] ?? null) : null,
+          })),
         }),
       ),
     };
@@ -90,11 +91,48 @@ async function fetchCourseData(
 
 export async function ensureCourseCached(
   externalId: string,
-): Promise<{ id: string }> {
+): Promise<{
+  id: string;
+  name: string;
+  city: string | null;
+  state: string | null;
+  tees: {
+    id: string;
+    name: string;
+    gender: string;
+    rating: number;
+    slope: number;
+    par: number;
+    holes: { holeNumber: number; par: number; strokeIndex: number }[];
+  }[];
+}> {
   const existing = await prisma.course.findUnique({
     where: { source_externalId: { source: "GOLF_COURSE_API", externalId } },
+    include: {
+      tees: { include: { holes: { orderBy: { holeNumber: "asc" } } } },
+    },
   });
-  if (existing) return { id: existing.id };
+  if (existing) {
+    return {
+      id: existing.id,
+      name: existing.name,
+      city: existing.city,
+      state: existing.state,
+      tees: existing.tees.map((t) => ({
+        id: t.id,
+        name: t.name,
+        gender: t.gender,
+        rating: t.rating,
+        slope: t.slope,
+        par: t.par,
+        holes: t.holes.map((h) => ({
+          holeNumber: h.holeNumber,
+          par: h.par,
+          strokeIndex: h.strokeIndex,
+        })),
+      })),
+    };
+  }
 
   const apiData = await fetchCourseData(externalId);
   if (!apiData) throw new Error("Failed to fetch course data");
@@ -106,7 +144,6 @@ export async function ensureCourseCached(
       },
       update: {
         name: apiData.name,
-        club: apiData.club,
         city: apiData.city,
         state: apiData.state,
         lat: apiData.lat,
@@ -114,7 +151,6 @@ export async function ensureCourseCached(
       },
       create: {
         name: apiData.name,
-        club: apiData.club,
         city: apiData.city,
         state: apiData.state,
         lat: apiData.lat,
@@ -154,5 +190,30 @@ export async function ensureCourseCached(
     return c;
   });
 
-  return { id: course.id };
+  const fullCourse = await prisma.course.findUnique({
+    where: { id: course.id },
+    include: {
+      tees: { include: { holes: { orderBy: { holeNumber: "asc" } } } },
+    },
+  });
+
+  return {
+    id: fullCourse!.id,
+    name: fullCourse!.name,
+    city: fullCourse!.city,
+    state: fullCourse!.state,
+    tees: fullCourse!.tees.map((t) => ({
+      id: t.id,
+      name: t.name,
+      gender: t.gender,
+      rating: t.rating,
+      slope: t.slope,
+      par: t.par,
+      holes: t.holes.map((h) => ({
+        holeNumber: h.holeNumber,
+        par: h.par,
+        strokeIndex: h.strokeIndex,
+      })),
+    })),
+  };
 }

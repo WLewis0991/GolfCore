@@ -1,11 +1,29 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useCallback, useMemo, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ensureCourseCached } from "@/lib/actions/courses";
 import { createRound } from "@/lib/actions/rounds";
 
-type TeeWithHoles = {
+type SearchCourse = {
+  id: string;
+  name: string;
+  city: string | null;
+  state: string | null;
+  lat: number | null;
+  lng: number | null;
+};
+
+type NearbyCourse = {
+  id: number;
+  name: string;
+  lat: number;
+  lng: number;
+  distance: number;
+};
+
+type TeeData = {
   id: string;
   name: string;
   gender: string;
@@ -15,12 +33,12 @@ type TeeWithHoles = {
   holes: { holeNumber: number; par: number; strokeIndex: number }[];
 };
 
-type CourseWithTees = {
+type CourseData = {
   id: string;
   name: string;
   city: string | null;
   state: string | null;
-  tees: TeeWithHoles[];
+  tees: TeeData[];
 };
 
 type HoleScore = {
@@ -30,45 +48,130 @@ type HoleScore = {
   score: number | null;
 };
 
-export function RoundForm({ courses }: { courses: CourseWithTees[] }) {
+export function RoundForm() {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(createRound, null);
 
   const [query, setQuery] = useState("");
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchCourse[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchMode, setSearchMode] = useState<"search" | "location">("search");
+
+  const [nearbyCourses, setNearbyCourses] = useState<NearbyCourse[]>([]);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [radiusMiles, setRadiusMiles] = useState(10);
+
+  const [selectedCourse, setSelectedCourse] = useState<CourseData | null>(null);
+  const [isLoadingCourse, setIsLoadingCourse] = useState(false);
   const [selectedTeeId, setSelectedTeeId] = useState<string | null>(null);
+
   const [datePlayed, setDatePlayed] = useState(
     new Date().toISOString().split("T")[0],
   );
   const [holesPlayed, setHolesPlayed] = useState(18);
-  const [courseHandicapSource, setCourseHandicapSource] = useState<"INDEX" | "MANUAL">("INDEX");
+  const [courseHandicapSource, setCourseHandicapSource] = useState<
+    "INDEX" | "MANUAL"
+  >("INDEX");
   const [courseHandicap, setCourseHandicap] = useState("");
   const [notes, setNotes] = useState("");
   const [holeScores, setHoleScores] = useState<HoleScore[]>([]);
 
-  const filteredCourses = useMemo(() => {
-    if (!query) return courses;
-    const q = query.toLowerCase();
-    return courses.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.city?.toLowerCase().includes(q) ||
-        c.state?.toLowerCase().includes(q),
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      if (query.length < 2) {
+        setSearchResults([]);
+        return;
+      }
+      setIsSearching(true);
+      try {
+        const res = await fetch(
+          `/api/courses/search?q=${encodeURIComponent(query)}`,
+        );
+        const data = await res.json();
+        setSearchResults(Array.isArray(data) ? data : []);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query]);
+
+  const handleSearchSelect = useCallback(
+    async (course: SearchCourse) => {
+      setIsLoadingCourse(true);
+      try {
+        const full = await ensureCourseCached(course.id);
+        setSelectedCourse(full);
+        setSelectedTeeId(null);
+        setHoleScores([]);
+        setQuery(full.name);
+        setSearchResults([]);
+      } catch {
+        setLocationError("Failed to load course data");
+      } finally {
+        setIsLoadingCourse(false);
+      }
+    },
+    [],
+  );
+
+  const handleNearbySelect = useCallback(
+    async (course: NearbyCourse) => {
+      setIsLoadingCourse(true);
+      try {
+        const full = await ensureCourseCached(String(course.id));
+        setSelectedCourse(full);
+        setSelectedTeeId(null);
+        setHoleScores([]);
+        setSearchMode("search");
+        setQuery(full.name);
+        setNearbyCourses([]);
+      } catch {
+        setLocationError("Failed to load course data");
+      } finally {
+        setIsLoadingCourse(false);
+      }
+    },
+    [],
+  );
+
+  const handleUseLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation not supported");
+      return;
+    }
+    setIsLocating(true);
+    setLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await fetch(
+            `/api/courses/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}&radiusMiles=${radiusMiles}`,
+          );
+          const data = await res.json();
+          setNearbyCourses(Array.isArray(data) ? data : []);
+        } catch {
+          setLocationError("Failed to find nearby courses");
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      () => {
+        setLocationError("Location access denied");
+        setIsLocating(false);
+      },
     );
-  }, [courses, query]);
+  }, [radiusMiles]);
 
-  const selectedCourse = courses.find((c) => c.id === selectedCourseId);
   const selectedTee = selectedCourse?.tees.find((t) => t.id === selectedTeeId);
-
-  const handleCourseSelect = useCallback((courseId: string) => {
-    setSelectedCourseId(courseId);
-    setSelectedTeeId(null);
-    setHoleScores([]);
-  }, []);
-
-  const handleTeeSelect = useCallback((teeId: string) => {
-    setSelectedTeeId(teeId);
-  }, []);
 
   const selectedTeeData = useMemo(() => {
     if (!selectedTee) return null;
@@ -99,9 +202,7 @@ export function RoundForm({ courses }: { courses: CourseWithTees[] }) {
   const adjustedGross = useMemo(() => {
     if (!selectedTee || holeScores.length === 0) return 0;
     const ch =
-      courseHandicapSource === "MANUAL"
-        ? Number(courseHandicap) || 0
-        : 0;
+      courseHandicapSource === "MANUAL" ? Number(courseHandicap) || 0 : 0;
     return holeScores.reduce((sum, hs) => {
       const cap = hs.par + 2 + (hs.strokeIndex <= ch ? 1 : 0);
       const effective = hs.score === null ? cap : Math.min(hs.score, cap);
@@ -136,42 +237,147 @@ export function RoundForm({ courses }: { courses: CourseWithTees[] }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Course search */}
+      {/* Course search / location */}
       <div>
-        <label className="mb-1 block text-[11px] font-semibold tracking-[0.1em] text-[var(--text-secondary)] uppercase">
-          Course
-        </label>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search courses..."
-          className="w-full rounded border border-[var(--text-tertiary)]/30 bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--gold)]"
-        />
-        {query && filteredCourses.length > 0 && (
-          <div className="mt-1 max-h-40 overflow-y-auto rounded border border-[var(--text-tertiary)]/20 bg-[var(--surface)]">
-            {filteredCourses.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => {
-                  handleCourseSelect(c.id);
-                  setQuery(c.name);
-                }}
-                className="w-full px-3 py-2 text-left text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--green-deep)]"
-              >
-                {c.name}
-                {c.city && (
-                  <span className="ml-2 text-[var(--text-secondary)]">
-                    {c.city}
-                    {c.state && `, ${c.state}`}
-                  </span>
+        <div className="mb-2 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setSearchMode("search")}
+            className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+              searchMode === "search"
+                ? "bg-[var(--gold)]/10 text-[var(--gold)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            Search courses
+          </button>
+          <button
+            type="button"
+            onClick={() => setSearchMode("location")}
+            className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+              searchMode === "location"
+                ? "bg-[var(--gold)]/10 text-[var(--gold)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            Use my location
+          </button>
+        </div>
+
+        {searchMode === "search" ? (
+          <>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search courses..."
+              disabled={isLoadingCourse}
+              className="w-full rounded border border-[var(--text-tertiary)]/30 bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--gold)] disabled:opacity-50"
+            />
+            {(isSearching || searchResults.length > 0) && query.length >= 2 && (
+              <div className="mt-1 max-h-40 overflow-y-auto rounded border border-[var(--text-tertiary)]/20 bg-[var(--surface)]">
+                {isSearching ? (
+                  <div className="px-3 py-2 text-sm text-[var(--text-secondary)]">
+                    Searching...
+                  </div>
+                ) : (
+                  searchResults.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => handleSearchSelect(c)}
+                      disabled={isLoadingCourse}
+                      className="w-full px-3 py-2 text-left text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--green-deep)] disabled:opacity-50"
+                    >
+                      {c.name}
+                      {c.city && (
+                        <span className="ml-2 text-[var(--text-secondary)]">
+                          {c.city}
+                          {c.state && `, ${c.state}`}
+                        </span>
+                      )}
+                    </button>
+                  ))
                 )}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-[var(--text-secondary)]">
+                  Radius:
+                </label>
+                <select
+                  value={radiusMiles}
+                  onChange={(e) => setRadiusMiles(Number(e.target.value))}
+                  className="rounded border border-[var(--text-tertiary)]/30 bg-[var(--surface)] px-2 py-1.5 text-xs text-[var(--foreground)] outline-none focus:border-[var(--gold)]"
+                >
+                  <option value={5}>5 mi</option>
+                  <option value={10}>10 mi</option>
+                  <option value={25}>25 mi</option>
+                  <option value={50}>50 mi</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={handleUseLocation}
+                disabled={isLocating}
+                className="rounded bg-[var(--green)] px-3 py-1.5 text-xs font-medium text-[var(--background)] transition-colors hover:bg-[var(--green-soft)] disabled:opacity-50"
+              >
+                {isLocating ? "Finding..." : "Find nearby"}
               </button>
-            ))}
+            </div>
+            {locationError && (
+              <p className="text-xs text-red-400">{locationError}</p>
+            )}
+            {nearbyCourses.length > 0 && (
+              <div className="max-h-40 overflow-y-auto rounded border border-[var(--text-tertiary)]/20 bg-[var(--surface)]">
+                {nearbyCourses.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => handleNearbySelect(c)}
+                    disabled={isLoadingCourse}
+                    className="w-full px-3 py-2 text-left text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--green-deep)] disabled:opacity-50"
+                  >
+                    {c.name}
+                    <span className="ml-2 text-[var(--text-secondary)]">
+                      {c.distance.toFixed(1)} mi
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {isLoadingCourse && (
+          <div className="mt-2 text-xs text-[var(--text-secondary)]">
+            Loading course data...
           </div>
         )}
       </div>
+
+      {/* Selected course display */}
+      {selectedCourse && (
+        <div className="rounded border border-[var(--text-tertiary)]/20 bg-[var(--surface)] p-3">
+          <div className="text-sm font-medium text-[var(--foreground)]">
+            {selectedCourse.name}
+          </div>
+          {selectedCourse.city && (
+            <div className="text-xs text-[var(--text-secondary)]">
+              {selectedCourse.city}
+              {selectedCourse.state && `, ${selectedCourse.state}`}
+            </div>
+          )}
+          <div className="mt-1 text-xs text-[var(--text-secondary)]">
+            {selectedCourse.tees.length} tee
+            {selectedCourse.tees.length !== 1 ? "s" : ""} available
+          </div>
+        </div>
+      )}
 
       {/* Tee selection */}
       {selectedCourse && (
@@ -184,7 +390,10 @@ export function RoundForm({ courses }: { courses: CourseWithTees[] }) {
               <button
                 key={t.id}
                 type="button"
-                onClick={() => handleTeeSelect(t.id)}
+                onClick={() => {
+                  setSelectedTeeId(t.id);
+                  setHoleScores([]);
+                }}
                 className={`rounded border px-3 py-1.5 text-xs font-medium transition-colors ${
                   selectedTeeId === t.id
                     ? "border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]"
