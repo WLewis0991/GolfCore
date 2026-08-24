@@ -4,6 +4,7 @@ import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { useState } from "react";
 
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils/format";
 
 const links = [
@@ -41,6 +42,7 @@ export function Nav() {
         </div>
 
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <UserButton
             appearance={{
               elements: {

@@ -12,6 +12,18 @@
   --surface: #0e1510;
 }
 
+html.light {
+  --background: #f8f5ef;
+  --foreground: #1a2118;
+  --green-deep: #e8f0eb;
+  --green: #2d6b42;
+  --green-soft: #3a7d52;
+  --gold: #8a6a1e;
+  --text-secondary: #5a6b5e;
+  --text-tertiary: #a0ada3;
+  --surface: #ffffff;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
