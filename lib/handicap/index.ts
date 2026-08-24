@@ -3,9 +3,9 @@ import {
   MAX_ROUNDS_CONSIDERED,
   MIN_ROUNDS_FOR_INDEX,
 } from "./constants";
+import { getDifferentialsUsed } from "./differentials-used";
 import { roundToTenth } from "./rounding";
 import type { ScoreDifferential } from "./types";
-import { getDifferentialsUsed } from "./differentials-used";
 
 export function calculateIndex(
   differentials: ScoreDifferential[],
