@@ -1,0 +1,19 @@
+# *
+User-agent: *
+Allow: /
+
+# *
+User-agent: *
+Disallow: /sign-in
+Disallow: /sign-up
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /rounds/
+Disallow: /history/
+Disallow: /courses/
+
+# Host
+Host: https://golfcore.vercel.app
+
+# Sitemaps
+Sitemap: https://golfcore.vercel.app/sitemap.xml
