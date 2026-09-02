@@ -1,6 +1,7 @@
 import "./globals.css";
 
 import { ClerkProvider, Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
+import { Analytics } from "@vercel/analytics/react";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Sora } from "next/font/google";
 import { ThemeProvider } from "next-themes";
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               },
             }}
           >
+            <Analytics />
             <header className="flex items-center justify-end gap-4 p-4">
               <Show when="signed-out">
                 <SignInButton />
