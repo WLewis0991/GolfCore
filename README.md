@@ -12,17 +12,17 @@
 ## Screenshots
 
 ### Landing — Golf Core
-![Golf Core landing page](/main-screenshot.png)
+![Golf Core landing page](/public/main-screenshot.png)
 
 *Dark scorecard-inspired landing with a single "Enter" call to action.*
 
 ### Add Round — Course Search & Tee Selection
-![Add round form with course search](/course.png)
+![Add round form with course search](/public/course.png)
 
 *Course search (OpenGolfAPI), tee selection with rating/slope, date, 9/18-hole toggle, and notes — mobile-first for logging on the course.*
 
 ### Dashboard — Handicap Index & Recent Rounds
-![Dashboard with handicap index and recent rounds](/Dashboard.png)
+![Dashboard with handicap index and recent rounds](/public/Dashboard.png)
 
 *Real-time handicap index, recent rounds with differentials, and quick navigation to all features (light theme shown; dark theme also supported).*
 
