@@ -44,18 +44,37 @@ function getBoundingBox(
   return [lat - latDelta, lng - lngDelta, lat + latDelta, lng + lngDelta];
 }
 
+type OverpassElement = {
+  id: number;
+  lat?: number;
+  lon?: number;
+  center?: { lat: number; lon: number };
+  tags?: { name?: string };
+};
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const lat = parseFloat(searchParams.get("lat") ?? "");
   const lng = parseFloat(searchParams.get("lng") ?? "");
-  const radiusMiles = parseFloat(searchParams.get("radiusMiles") ?? "10");
+  const parsedRadius = parseFloat(searchParams.get("radiusMiles") ?? "10");
 
-  if (isNaN(lat) || isNaN(lng)) {
+  if (
+    isNaN(lat) ||
+    isNaN(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
     return NextResponse.json(
       { error: "lat and lng are required" },
       { status: 400 },
     );
   }
+
+  const radiusMiles = isNaN(parsedRadius)
+    ? 10
+    : Math.min(50, Math.max(1, parsedRadius));
 
   const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)},${radiusMiles}`;
   const cached = cache.get(cacheKey);
@@ -66,7 +85,7 @@ export async function GET(request: NextRequest) {
   const [south, west, north, east] = getBoundingBox(lat, lng, radiusMiles);
   const query = `
     [out:json][timeout:15];
-    way["leisure"="golf_course"](${south},${west},${north},${east});
+    nwr["leisure"="golf_course"](${south},${west},${north},${east});
     out center;
   `;
 
@@ -86,16 +105,28 @@ export async function GET(request: NextRequest) {
 
     const data = await res.json();
     const courses: OverpassCourse[] = (data.elements ?? [])
+      .map((el: OverpassElement) => {
+        const courseLat = el.lat ?? el.center?.lat;
+        const courseLon = el.lon ?? el.center?.lon;
+        if (
+          typeof courseLat !== "number" ||
+          typeof courseLon !== "number" ||
+          !Number.isFinite(courseLat) ||
+          !Number.isFinite(courseLon)
+        ) {
+          return null;
+        }
+        return {
+          id: el.id,
+          name: el.tags?.name ?? "Unknown course",
+          lat: courseLat,
+          lng: courseLon,
+          distance: haversineDistance(lat, lng, courseLat, courseLon),
+        };
+      })
       .filter(
-        (el: { center?: { lat: number; lon: number } }) => el.center,
+        (c: OverpassCourse | null): c is OverpassCourse => c !== null,
       )
-      .map((el: { id: number; tags?: { name?: string }; center: { lat: number; lon: number } }) => ({
-        id: el.id,
-        name: el.tags?.name ?? "Unknown course",
-        lat: el.center.lat,
-        lng: el.center.lon,
-        distance: haversineDistance(lat, lng, el.center.lat, el.center.lon),
-      }))
       .sort((a: OverpassCourse, b: OverpassCourse) => a.distance - b.distance);
 
     cache.set(cacheKey, { data: courses, expires: Date.now() + CACHE_TTL });
