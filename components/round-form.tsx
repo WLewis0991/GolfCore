@@ -60,6 +60,7 @@ export function RoundForm() {
   const [nearbyCourses, setNearbyCourses] = useState<NearbyCourse[]>([]);
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
   const [radiusMiles, setRadiusMiles] = useState(10);
 
   const [selectedCourse, setSelectedCourse] = useState<CourseData | null>(null);
@@ -134,6 +135,7 @@ export function RoundForm() {
         setSearchMode("search");
         setQuery(full.name);
         setNearbyCourses([]);
+        setHasSearched(false);
       } catch {
         setLocationError("Failed to load course data");
       } finally {
@@ -150,16 +152,34 @@ export function RoundForm() {
     }
     setIsLocating(true);
     setLocationError(null);
+    setNearbyCourses([]);
+    setHasSearched(false);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
           const res = await fetch(
             `/api/courses/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}&radiusMiles=${radiusMiles}`,
           );
-          const data = await res.json();
-          setNearbyCourses(Array.isArray(data) ? data : []);
+          const data = await res.json().catch(() => null);
+          if (!res.ok) {
+            const message =
+              data && typeof data.error === "string"
+                ? data.error
+                : "Failed to find nearby courses";
+            setLocationError(message);
+            setNearbyCourses([]);
+            return;
+          }
+          if (!Array.isArray(data)) {
+            setLocationError("Failed to find nearby courses");
+            setNearbyCourses([]);
+            return;
+          }
+          setNearbyCourses(data);
+          setHasSearched(true);
         } catch {
           setLocationError("Failed to find nearby courses");
+          setNearbyCourses([]);
         } finally {
           setIsLocating(false);
         }
@@ -332,6 +352,15 @@ export function RoundForm() {
             {locationError && (
               <p className="text-xs text-red-400">{locationError}</p>
             )}
+            {hasSearched &&
+              !isLocating &&
+              !locationError &&
+              nearbyCourses.length === 0 && (
+                <p className="text-xs text-[var(--text-secondary)]">
+                  No courses found within {radiusMiles} mi. Try a larger
+                  radius.
+                </p>
+              )}
             {nearbyCourses.length > 0 && (
               <div className="max-h-40 overflow-y-auto rounded border border-[var(--text-tertiary)]/20 bg-[var(--surface)]">
                 {nearbyCourses.map((c) => (
